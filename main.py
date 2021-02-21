@@ -1,45 +1,52 @@
 import json
+import urllib.request
 import boto3
+import socket
 from botocore.exceptions import ClientError
 
 
+JSON_URL = "https://ip-ranges.atlassian.com/"
+SEC_GROUP_ID = "sg-04066ff7ffcbb1a3b"
+
+
 def main():
-    # CREATE LAMBDA CLIENT
-    client = boto3.client('lambda')
+	# CREATE LAMBDA CLIENT
+	client = boto3.client('ec2')
 
-    try:
-        # CREATE SECURITY GROUP
-        response = client.create_security_group(GroupName="SampleGroup")
-        securityGroupId = response["GroupId"]
-        print("Security group created. Name = " + securityGroupId)
+	try:
+		# CREATE SECURITY GROUP
+		# response = client.create_security_group(GroupName="SampleGroup", Description="SampleGroupDescription")
+		# securityGroupId = response["GroupId"]
+		# print("Security group created. Name = " + securityGroupId)
 
-        # PARSE ATLASSIAN IP RANGES
-        with open('ip-ranges.atlassian.json') as file:
-            allIpRanges = json.load(file)
+		# PARSE ATLASSIAN IP RANGES
+		jsonurl = urllib.request.urlopen(JSON_URL)
+		allIpRanges = json.loads(jsonurl.read().decode())
 
-        ipRanges = []
-        ipv6Ranges = []
-        for ip in allIpRanges["items"]:
-            cidr = ip["cidr"]
+		ipRanges = []
+		ipv6Ranges = []
+		for ip in allIpRanges["items"]:
+			cidr = ip["cidr"]
 
-            # SEPARATE IPV4 FROM IPV6
-            if ip["mask_len"] == 56:
-                # CONSTRUCT IPV4 AND IPV6 RANGES
-                ipv6Ranges += {'CidrIpv6': cidr}
-            else:
-                # CONSTRUCT IPV4 RANGES
-                ipRanges += {'CidrIp': cidr}
+			try:
+				# SEPARATE IPV4 FROM IPV6
+				socket.inet_aton(ip["network"])
+				# CONSTRUCT IPV4 RANGES
+				ipRanges.append({'CidrIp': cidr})
+			except socket.error:
+				# CONSTRUCT IPV6 RANGES
+				ipv6Ranges.append({'CidrIpv6': cidr})
 
-        # CONSTRUCT IP_PERMISSIONS
-        IPPermissions = {'IpProtocol': 'tcp', 'FromPort': 80, 'ToPort': 80, 'IpRanges': ipRanges, 'Ipv6Ranges': ipv6Ranges}
+		# CONSTRUCT IP_PERMISSIONS
+		IPPermissions = [{'IpProtocol': 'tcp', 'FromPort': 80, 'ToPort': 80, 'IpRanges': ipRanges, 'Ipv6Ranges': ipv6Ranges}]
 
-        # AUTHORIZE SECURITY GROUP INGRESS
-        data = client.authorize_security_group_ingress(GroupId=securityGroupId, IpPermissions=IPPermissions)
-        print("Ingress rules successfully set:\n" + data)
+		# AUTHORIZE SECURITY GROUP INGRESS
+		data = client.authorize_security_group_ingress(GroupId=SEC_GROUP_ID, IpPermissions=IPPermissions)
+		print("Ingress rules successfully set:\n %s" % data)
 
-    except ClientError as e:
-        print(e)
+	except ClientError as e:
+		print(e)
 
 
 if __name__ == '__main__':
-    main()
+	main()
