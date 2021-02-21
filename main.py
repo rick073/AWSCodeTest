@@ -9,15 +9,15 @@ JSON_URL = "https://ip-ranges.atlassian.com/"
 SEC_GROUP_ID = "sg-04066ff7ffcbb1a3b"
 
 
-def main():
+def lambda_handler(event, context):
 	# CREATE LAMBDA CLIENT
 	client = boto3.client('ec2')
 
 	try:
 		# CREATE SECURITY GROUP
 		# response = client.create_security_group(GroupName="SampleGroup", Description="SampleGroupDescription")
-		# securityGroupId = response["GroupId"]
-		# print("Security group created. Name = " + securityGroupId)
+		# SEC_GROUP_ID = response["GroupId"]
+		# print("Security group created. Name = " + SEC_GROUP_ID)
 
 		# PARSE ATLASSIAN IP RANGES
 		jsonurl = urllib.request.urlopen(JSON_URL)
@@ -47,6 +47,4 @@ def main():
 	except ClientError as e:
 		print(e)
 
-
-if __name__ == '__main__':
-	main()
+	return 0
